@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, Mail } from 'lucide-react'
@@ -17,6 +17,11 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,6 +55,11 @@ export default function AdminLoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return null
   }
 
   return (
