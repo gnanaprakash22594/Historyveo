@@ -212,17 +212,19 @@ export default function FeaturedAdminPage() {
         <Navigation />
         <div className="container mx-auto px-4 py-12">
           <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading featured content...</p>
+              <p className="text-sm text-muted-foreground mt-2">This will timeout in 3 seconds</p>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  // If not authenticated, don't render content (will redirect)
-  if (!user) {
-    return null
-  }
+  // Always render content - authentication is handled by redirects
+  console.log('Rendering featured content page, user:', user)
 
   return (
     <div className="min-h-screen bg-background">
