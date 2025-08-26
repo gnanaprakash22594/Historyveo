@@ -17,6 +17,7 @@ export default function FeaturedAdminPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -26,6 +27,7 @@ export default function FeaturedAdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    setMounted(true)
     const raw = typeof window !== 'undefined' ? localStorage.getItem('featuredItems') : null
     if (raw) {
       try { setItems(JSON.parse(raw)) } catch {}
@@ -57,6 +59,39 @@ export default function FeaturedAdminPage() {
     }
     check()
   }, [router])
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return null
+  }
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If not authenticated, don't render content (will redirect)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const uploadThumb = async (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -130,20 +165,6 @@ export default function FeaturedAdminPage() {
     const next = items.filter((i) => i.id !== id)
     setItems(next)
     if (typeof window !== 'undefined') localStorage.setItem('featuredItems', JSON.stringify(next))
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading...</p>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (

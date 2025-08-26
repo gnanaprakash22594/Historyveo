@@ -51,6 +51,7 @@ export default function MediaLibraryPage() {
   const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [media, setMedia] = useState<MediaItem[]>([])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
@@ -65,6 +66,7 @@ export default function MediaLibraryPage() {
   const STATUS_OPTIONS = ['processing', 'ready', 'failed']
 
   useEffect(() => {
+    setMounted(true)
     checkUser()
   }, [])
 
@@ -96,7 +98,7 @@ export default function MediaLibraryPage() {
       await fetchMedia()
     } catch (error) {
       console.error('Error checking user:', error)
-      router.push('/auth/signin')
+      router.push('/admin/login')
     } finally {
       setLoading(false)
     }
@@ -220,22 +222,37 @@ export default function MediaLibraryPage() {
     }
   }
 
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return null
+  }
+
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading media library...</p>
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
           </div>
         </div>
       </div>
     )
   }
 
+  // If not authenticated, don't render content (will redirect)
   if (!user) {
-    return null
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

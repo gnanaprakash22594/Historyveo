@@ -53,8 +53,9 @@ export default function AdminUploadPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [series, setSeries] = useState<any[]>([])
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -74,6 +75,7 @@ export default function AdminUploadPage() {
   })
 
   useEffect(() => {
+    setMounted(true)
     checkUser()
     fetchSeries()
   }, [])
@@ -105,7 +107,9 @@ export default function AdminUploadPage() {
       setUser(profile)
     } catch (error) {
       console.error('Error checking user:', error)
-      router.push('/auth/signin')
+      router.push('/admin/login')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -292,14 +296,33 @@ export default function AdminUploadPage() {
     }
   }
 
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return null
+  }
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If not authenticated, don't render content (will redirect)
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading...</p>
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
           </div>
         </div>
       </div>
