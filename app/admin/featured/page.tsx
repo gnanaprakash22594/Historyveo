@@ -72,25 +72,72 @@ export default function FeaturedAdminPage() {
 
   const loadFeaturedItems = async () => {
     try {
-      console.log('Loading featured items from localStorage...')
+      console.log('Loading featured items from database for cross-device access...')
       
-      // Load from localStorage (for items added in current session)
-      const localRaw = localStorage.getItem('featuredItems')
-      let localItems: FeaturedItem[] = []
-      if (localRaw) {
-        try {
-          localItems = JSON.parse(localRaw)
-          console.log('Loaded local items:', localItems.length)
-        } catch (error) {
-          console.error('Error parsing local items:', error)
-          localItems = []
+      // Always fetch from Supabase database first (primary source)
+      try {
+        const { data: dbVideos, error: dbError } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('visibility', 'public')
+          .eq('status', 'ready')
+          .not('youtube_video_id', 'is', null)
+          .order('created_at', { ascending: false })
+
+        if (dbError) {
+          console.error('Error fetching from database:', dbError)
+          // Fall back to localStorage if database fails
+          const localRaw = localStorage.getItem('featuredItems')
+          if (localRaw) {
+            try {
+              const localItems = JSON.parse(localRaw)
+              setItems(Array.isArray(localItems) ? localItems : [])
+              console.log('Fell back to localStorage items:', localItems.length)
+            } catch (error) {
+              console.error('Error parsing local items:', error)
+              setItems([])
+            }
+          } else {
+            setItems([])
+          }
+          return
+        }
+
+        // Convert database videos to FeaturedItem format
+        const dbFormattedItems: FeaturedItem[] = (dbVideos || []).map(video => ({
+          id: video.id || `db-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          title: video.title || 'Untitled',
+          description: video.description || 'No description',
+          youtubeUrl: `https://www.youtube.com/watch?v=${video.youtube_video_id}`,
+          thumbnailUrl: video.thumbnail_url || video.youtube_thumbnail_url || '',
+          createdAt: new Date(video.created_at || Date.now()).getTime()
+        } as any))
+
+        console.log('Loaded database items:', dbFormattedItems.length)
+        
+        // Update localStorage with database items for offline access
+        localStorage.setItem('featuredItems', JSON.stringify(dbFormattedItems))
+        
+        setItems(dbFormattedItems)
+        console.log('Total items loaded from database:', dbFormattedItems.length)
+        
+      } catch (dbError) {
+        console.error('Error in database fetch:', dbError)
+        // Fall back to localStorage
+        const localRaw = localStorage.getItem('featuredItems')
+        if (localRaw) {
+          try {
+            const localItems = JSON.parse(localRaw)
+            setItems(Array.isArray(localItems) ? localItems : [])
+            console.log('Fell back to localStorage items:', localItems.length)
+          } catch (error) {
+            console.error('Error parsing local items:', error)
+            setItems([])
+          }
+        } else {
+          setItems([])
         }
       }
-
-      // For now, just use localStorage items
-      // TODO: Add database integration when types are properly configured
-      setItems(localItems)
-      console.log('Total items loaded:', localItems.length)
       
     } catch (error) {
       console.error('Error loading featured items:', error)
@@ -196,7 +243,51 @@ export default function FeaturedAdminPage() {
         createdAt: Date.now()
       }
 
-      // Save to local state and localStorage
+      // Save to Supabase database for cross-device access
+      try {
+        console.log('Saving to Supabase database for cross-device access...')
+        const { data: dbVideo, error: dbError } = await supabase
+          .from('videos')
+          .insert({
+            title: newItem.title,
+            slug: `featured-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            description: newItem.description,
+            youtube_video_id: youtubeId,
+            thumbnail_url: newItem.thumbnailUrl,
+            status: 'ready',
+            visibility: 'public',
+            language: 'en',
+            created_at: new Date(newItem.createdAt).toISOString()
+          } as any)
+          .select()
+          .single()
+
+        if (dbError) {
+          console.error('Database save error:', dbError)
+          toast({ 
+            title: 'Warning', 
+            description: 'Content saved locally but may not sync across devices.', 
+            variant: 'default' 
+          })
+        } else {
+          console.log('Saved to database successfully:', dbVideo)
+          // Update the item with the database ID for proper tracking
+          newItem.id = (dbVideo as any).id
+          toast({ 
+            title: 'Success!', 
+            description: 'Content saved and will be available on all devices.' 
+          })
+        }
+      } catch (dbError) {
+        console.error('Error saving to database:', dbError)
+        toast({ 
+          title: 'Warning', 
+          description: 'Content saved locally but may not sync across devices.', 
+          variant: 'default' 
+        })
+      }
+
+      // Save to local state and localStorage for immediate access
       const updatedItems = [newItem, ...items]
       setItems(updatedItems)
       localStorage.setItem('featuredItems', JSON.stringify(updatedItems))
@@ -207,7 +298,6 @@ export default function FeaturedAdminPage() {
       setYoutubeUrl('')
       setThumbnailUrl(null)
       
-      toast({ title: 'Featured content added successfully!' })
       console.log('Featured content added:', newItem)
     } catch (error) {
       console.error('Error adding featured content:', error)
