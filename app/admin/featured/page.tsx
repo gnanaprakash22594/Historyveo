@@ -70,13 +70,28 @@ export default function FeaturedAdminPage() {
     return () => clearTimeout(timeoutId)
   }, [])
 
-  const loadFeaturedItems = () => {
+  const loadFeaturedItems = async () => {
     try {
-      const raw = localStorage.getItem('featuredItems')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        setItems(Array.isArray(parsed) ? parsed : [])
+      console.log('Loading featured items from localStorage...')
+      
+      // Load from localStorage (for items added in current session)
+      const localRaw = localStorage.getItem('featuredItems')
+      let localItems: FeaturedItem[] = []
+      if (localRaw) {
+        try {
+          localItems = JSON.parse(localRaw)
+          console.log('Loaded local items:', localItems.length)
+        } catch (error) {
+          console.error('Error parsing local items:', error)
+          localItems = []
+        }
       }
+
+      // For now, just use localStorage items
+      // TODO: Add database integration when types are properly configured
+      setItems(localItems)
+      console.log('Total items loaded:', localItems.length)
+      
     } catch (error) {
       console.error('Error loading featured items:', error)
       setItems([])
@@ -181,6 +196,7 @@ export default function FeaturedAdminPage() {
         createdAt: Date.now()
       }
 
+      // Save to local state and localStorage
       const updatedItems = [newItem, ...items]
       setItems(updatedItems)
       localStorage.setItem('featuredItems', JSON.stringify(updatedItems))
@@ -192,7 +208,9 @@ export default function FeaturedAdminPage() {
       setThumbnailUrl(null)
       
       toast({ title: 'Featured content added successfully!' })
+      console.log('Featured content added:', newItem)
     } catch (error) {
+      console.error('Error adding featured content:', error)
       toast({ title: 'Failed to add featured content', description: 'Please try again.', variant: 'destructive' })
     } finally {
       setSaving(false)
@@ -290,6 +308,79 @@ export default function FeaturedAdminPage() {
     }
   }
 
+  const importExistingContent = async () => {
+    try {
+      console.log('Importing existing content from database...')
+      
+      // Try to fetch existing videos that could be featured
+      const { data: existingVideos, error } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('visibility', 'public')
+        .eq('status', 'ready')
+        .not('youtube_video_id', 'is', null)
+        .limit(10)
+
+      if (error) {
+        console.error('Error fetching existing videos:', error)
+        toast({ 
+          title: 'Import failed', 
+          description: 'Could not fetch existing content from database.', 
+          variant: 'destructive' 
+        })
+        return
+      }
+
+      if (!existingVideos || existingVideos.length === 0) {
+        toast({ 
+          title: 'No content found', 
+          description: 'No existing videos found in database to import.', 
+          variant: 'default' 
+        })
+        return
+      }
+
+      // Convert to FeaturedItem format
+      const importedItems: FeaturedItem[] = existingVideos.map(video => ({
+        id: `imported-${video.id}`,
+        title: video.title || 'Untitled',
+        description: video.description || 'No description',
+        youtubeUrl: `https://www.youtube.com/watch?v=${video.youtube_video_id}`,
+        thumbnailUrl: video.thumbnail_url || video.youtube_thumbnail_url || '',
+        createdAt: new Date(video.created_at || Date.now()).getTime()
+      }))
+
+      // Merge with existing items
+      const currentItems = [...items]
+      importedItems.forEach(importedItem => {
+        const exists = currentItems.some(item => 
+          item.youtubeUrl === importedItem.youtubeUrl || 
+          item.title === importedItem.title
+        )
+        if (!exists) {
+          currentItems.push(importedItem)
+        }
+      })
+
+      setItems(currentItems)
+      localStorage.setItem('featuredItems', JSON.stringify(currentItems))
+      
+      toast({ 
+        title: 'Import successful', 
+        description: `Imported ${importedItems.length} items from database.` 
+      })
+      
+      console.log('Import completed:', importedItems.length, 'items imported')
+    } catch (error) {
+      console.error('Error importing existing content:', error)
+      toast({ 
+        title: 'Import failed', 
+        description: 'An error occurred while importing content.', 
+        variant: 'destructive' 
+      })
+    }
+  }
+
   // Prevent hydration mismatch
   if (!mounted) {
     return null
@@ -327,10 +418,18 @@ export default function FeaturedAdminPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold">Featured Content Management</h1>
               <p className="text-muted-foreground">Add YouTube videos to showcase on your homepage</p>
             </div>
+            <Button 
+              variant="outline" 
+              onClick={importExistingContent}
+              className="whitespace-nowrap"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import Existing
+            </Button>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
