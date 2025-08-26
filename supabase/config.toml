@@ -1,0 +1,12 @@
+project_id = "gibvehxmutuimuynbsmn"
+
+[auth]
+  site_url = "https://historyveo.com"
+  additional_redirect_urls = ["http://localhost:54321/auth/v1/callback"]
+  jwt_expiry = 3600
+
+[auth.email]
+  enable_signup = true
+
+[auth.sms]
+  enable_signup = false

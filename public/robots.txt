@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://historyveo.com/sitemap.xml
+
+# Disallow admin and upload areas
+Disallow: /admin/
+Disallow: /upload/
+Disallow: /api/webhooks/
+
+# Allow public content
+Allow: /explore/
+Allow: /series/
+Allow: /video/
+Allow: /auth/signin
+Allow: /auth/signup
+
+# Crawl delay
+Crawl-delay: 1
