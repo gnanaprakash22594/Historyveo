@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [authTimeout, setAuthTimeout] = useState(false)
   const [stats, setStats] = useState<AdminStats>({
     totalVideos: 0,
     totalUsers: 0,
@@ -43,24 +44,70 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setMounted(true)
+    
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.log('Authentication timeout, redirecting to login')
+        setAuthTimeout(true)
+        setLoading(false)
+        router.push('/admin/login')
+      }
+    }, 10000) // 10 second timeout
+
     checkUser()
+
+    return () => clearTimeout(timeoutId)
   }, [])
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      console.log('Checking user authentication...')
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError) {
+        console.error('Auth error:', authError)
+        router.push('/admin/login')
+        return
+      }
+      
       if (!user) {
+        console.log('No user found, redirecting to login')
         router.push('/admin/login')
         return
       }
 
-      const { data: profile } = await supabase
+      console.log('User found, checking profile...', user.id)
+      const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
-      if (!profile || (profile as any).role !== 'admin') {
+      if (profileError) {
+        console.error('Profile error:', profileError)
+        toast({
+          title: "Profile Error",
+          description: "Failed to load user profile.",
+          variant: "destructive",
+        })
+        router.push('/admin/login')
+        return
+      }
+
+      if (!profile) {
+        console.log('No profile found')
+        toast({
+          title: "Access denied",
+          description: "User profile not found.",
+          variant: "destructive",
+        })
+        router.push('/admin/login')
+        return
+      }
+
+      if ((profile as any).role !== 'admin') {
+        console.log('User is not admin, role:', (profile as any).role)
         toast({
           title: "Access denied",
           description: "You need admin privileges to access this page.",
@@ -70,12 +117,19 @@ export default function AdminDashboard() {
         return
       }
 
+      console.log('Admin user verified, setting user state')
       setUser(profile)
       await fetchStats()
     } catch (error) {
       console.error('Error checking user:', error)
+      toast({
+        title: "Authentication Error",
+        description: "Failed to verify user authentication.",
+        variant: "destructive",
+      })
       router.push('/admin/login')
     } finally {
+      console.log('Setting loading to false')
       setLoading(false)
     }
   }
@@ -111,8 +165,36 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-background">
         <Navigation />
         <div className="container mx-auto px-4 py-12">
-          <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2">Loading Admin Panel</h2>
+              <p className="text-muted-foreground">Verifying your admin privileges...</p>
+              <p className="text-sm text-muted-foreground mt-2">This may take a few seconds</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If authentication timed out, show error
+  if (authTimeout) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2 text-destructive">Authentication Timeout</h2>
+              <p className="text-muted-foreground">Please try logging in again</p>
+              <Button 
+                onClick={() => router.push('/admin/login')}
+                className="mt-4"
+              >
+                Go to Login
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -125,8 +207,12 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-background">
         <Navigation />
         <div className="container mx-auto px-4 py-12">
-          <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2">Redirecting to Login</h2>
+              <p className="text-muted-foreground">Please wait...</p>
+            </div>
           </div>
         </div>
       </div>
