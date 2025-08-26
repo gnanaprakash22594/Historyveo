@@ -17,36 +17,64 @@ export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
+  console.log('AdminDashboard component rendering, loading:', loading, 'user:', user)
+
   useEffect(() => {
+    console.log('AdminDashboard useEffect running')
     // Simple auth check
     const checkAuth = async () => {
+      console.log('Starting admin auth check...')
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          // Quick role check
-          const { data: profile } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-          
-          if (profile?.role === 'admin') {
-            setUser(profile)
-          } else {
-            // Not admin, redirect
-            window.location.href = '/admin/login'
-            return
-          }
-        } else {
-          // No user, redirect
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        console.log('Auth result:', { user, error: authError })
+        
+        if (authError) {
+          console.error('Auth error:', authError)
           window.location.href = '/admin/login'
           return
         }
+        
+        if (!user) {
+          console.log('No user found, redirecting to login')
+          window.location.href = '/admin/login'
+          return
+        }
+
+        console.log('User found, checking profile...', user.id)
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        console.log('Profile result:', { profile, error: profileError })
+        
+        if (profileError) {
+          console.error('Profile error:', profileError)
+          window.location.href = '/admin/login'
+          return
+        }
+        
+        if (!profile) {
+          console.log('No profile found')
+          window.location.href = '/admin/login'
+          return
+        }
+
+        if ((profile as any).role !== 'admin') {
+          console.log('User is not admin, role:', (profile as any).role)
+          window.location.href = '/admin/login'
+          return
+        }
+
+        console.log('Admin user verified successfully, setting user state')
+        setUser(profile)
       } catch (error) {
-        // Error, redirect
+        console.error('Unexpected error in auth check:', error)
         window.location.href = '/admin/login'
         return
       } finally {
+        console.log('Setting loading to false')
         setLoading(false)
       }
     }
@@ -56,6 +84,7 @@ export default function AdminDashboard() {
 
   // Simple loading state
   if (loading) {
+    console.log('Rendering loading state')
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -64,6 +93,7 @@ export default function AdminDashboard() {
             <div className="text-center">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
               <p>Loading admin panel...</p>
+              <p className="text-sm text-muted-foreground mt-2">Check browser console for debug info</p>
             </div>
           </div>
         </div>
@@ -73,8 +103,24 @@ export default function AdminDashboard() {
 
   // If no user, show nothing (will redirect)
   if (!user) {
-    return null
+    console.log('No user found, showing redirect message')
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2">Redirecting to Login</h2>
+              <p className="text-muted-foreground">Please wait...</p>
+              <p className="text-sm text-muted-foreground mt-2">If this takes too long, check the console</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
+
+  console.log('Rendering admin dashboard content')
 
   return (
     <div className="min-h-screen bg-background">
