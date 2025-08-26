@@ -72,75 +72,47 @@ export default function FeaturedAdminPage() {
 
   const loadFeaturedItems = async () => {
     try {
-      console.log('Loading featured items from database for cross-device access...')
+      console.log('Loading featured items from database...')
       
-      // Always fetch from Supabase database first (primary source)
-      try {
-        const { data: dbVideos, error: dbError } = await supabase
-          .from('videos')
-          .select('*')
-          .eq('visibility', 'public')
-          .eq('status', 'ready')
-          .not('youtube_video_id', 'is', null)
-          .order('created_at', { ascending: false })
+      const { data: dbVideos, error: dbError } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('visibility', 'public')
+        .eq('status', 'ready')
+        .not('youtube_video_id', 'is', null)
+        .order('created_at', { ascending: false })
 
-        if (dbError) {
-          console.error('Error fetching from database:', dbError)
-          // Fall back to localStorage if database fails
-          const localRaw = localStorage.getItem('featuredItems')
-          if (localRaw) {
-            try {
-              const localItems = JSON.parse(localRaw)
-              setItems(Array.isArray(localItems) ? localItems : [])
-              console.log('Fell back to localStorage items:', localItems.length)
-            } catch (error) {
-              console.error('Error parsing local items:', error)
-              setItems([])
-            }
-          } else {
-            setItems([])
-          }
-          return
-        }
-
-        // Convert database videos to FeaturedItem format
-        const dbFormattedItems: FeaturedItem[] = (dbVideos || []).map(video => ({
-          id: video.id || `db-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          title: video.title || 'Untitled',
-          description: video.description || 'No description',
-          youtubeUrl: `https://www.youtube.com/watch?v=${video.youtube_video_id}`,
-          thumbnailUrl: video.thumbnail_url || video.youtube_thumbnail_url || '',
-          createdAt: new Date(video.created_at || Date.now()).getTime()
-        } as any))
-
-        console.log('Loaded database items:', dbFormattedItems.length)
-        
-        // Update localStorage with database items for offline access
-        localStorage.setItem('featuredItems', JSON.stringify(dbFormattedItems))
-        
-        setItems(dbFormattedItems)
-        console.log('Total items loaded from database:', dbFormattedItems.length)
-        
-      } catch (dbError) {
-        console.error('Error in database fetch:', dbError)
-        // Fall back to localStorage
-        const localRaw = localStorage.getItem('featuredItems')
-        if (localRaw) {
-          try {
-            const localItems = JSON.parse(localRaw)
-            setItems(Array.isArray(localItems) ? localItems : [])
-            console.log('Fell back to localStorage items:', localItems.length)
-          } catch (error) {
-            console.error('Error parsing local items:', error)
-            setItems([])
-          }
-        } else {
-          setItems([])
-        }
+      if (dbError) {
+        console.error('Error fetching from database:', dbError)
+        toast({ 
+          title: 'Error loading content', 
+          description: 'Could not fetch featured content from database.', 
+          variant: 'destructive' 
+        })
+        setItems([])
+        return
       }
+
+      // Convert database videos to FeaturedItem format
+      const dbFormattedItems: FeaturedItem[] = (dbVideos || []).map(video => ({
+        id: video.id || `db-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        title: video.title || 'Untitled',
+        description: video.description || 'No description',
+        youtubeUrl: `https://www.youtube.com/watch?v=${video.youtube_video_id}`,
+        thumbnailUrl: video.thumbnail_url || video.youtube_thumbnail_url || '',
+        createdAt: new Date(video.created_at || Date.now()).getTime()
+      } as any))
+
+      console.log('Loaded database items:', dbFormattedItems.length)
+      setItems(dbFormattedItems)
       
     } catch (error) {
       console.error('Error loading featured items:', error)
+      toast({ 
+        title: 'Error loading content', 
+        description: 'Failed to load featured content.', 
+        variant: 'destructive' 
+      })
       setItems([])
     }
   }
@@ -245,7 +217,7 @@ export default function FeaturedAdminPage() {
 
       // Save to Supabase database for cross-device access
       try {
-        console.log('Saving to Supabase database for cross-device access...')
+        console.log('Saving to Supabase database...')
         const { data: dbVideo, error: dbError } = await supabase
           .from('videos')
           .insert({
@@ -265,40 +237,38 @@ export default function FeaturedAdminPage() {
         if (dbError) {
           console.error('Database save error:', dbError)
           toast({ 
-            title: 'Warning', 
-            description: 'Content saved locally but may not sync across devices.', 
-            variant: 'default' 
+            title: 'Failed to save', 
+            description: 'Could not save content to database. Please try again.', 
+            variant: 'destructive' 
           })
-        } else {
-          console.log('Saved to database successfully:', dbVideo)
-          // Update the item with the database ID for proper tracking
-          newItem.id = (dbVideo as any).id
-          toast({ 
-            title: 'Success!', 
-            description: 'Content saved and will be available on all devices.' 
-          })
+          return
         }
+
+        console.log('Saved to database successfully:', dbVideo)
+        
+        // Reset form
+        setTitle('')
+        setDescription('')
+        setYoutubeUrl('')
+        setThumbnailUrl(null)
+        
+        // Reload items from database to show the new content
+        await loadFeaturedItems()
+        
+        toast({ 
+          title: 'Success!', 
+          description: 'Content saved and will be available on all devices.' 
+        })
+        
+        console.log('Featured content added:', newItem)
       } catch (dbError) {
         console.error('Error saving to database:', dbError)
         toast({ 
-          title: 'Warning', 
-          description: 'Content saved locally but may not sync across devices.', 
-          variant: 'default' 
+          title: 'Failed to save', 
+          description: 'An error occurred while saving content.', 
+          variant: 'destructive' 
         })
       }
-
-      // Save to local state and localStorage for immediate access
-      const updatedItems = [newItem, ...items]
-      setItems(updatedItems)
-      localStorage.setItem('featuredItems', JSON.stringify(updatedItems))
-      
-      // Reset form
-      setTitle('')
-      setDescription('')
-      setYoutubeUrl('')
-      setThumbnailUrl(null)
-      
-      console.log('Featured content added:', newItem)
     } catch (error) {
       console.error('Error adding featured content:', error)
       toast({ title: 'Failed to add featured content', description: 'Please try again.', variant: 'destructive' })
@@ -347,51 +317,70 @@ export default function FeaturedAdminPage() {
   }
 
   const removeItem = async (id: string) => {
-    // Add confirmation dialog
-    if (!confirm('Are you sure you want to remove this featured content? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to remove this featured content?')) {
       return
     }
-    
+
     try {
-      console.log('Removing item with ID:', id)
+      console.log('Removing item:', id)
       
-      // Find the item to get the thumbnail URL
-      const itemToRemove = items.find(item => item.id === id)
-      if (itemToRemove?.thumbnailUrl) {
-        console.log('Attempting to delete thumbnail from storage:', itemToRemove.thumbnailUrl)
-        
-        // Extract the path from the URL to delete from Supabase storage
+      // Try to delete from database if it's a database item
+      if (id.startsWith('db-') || !id.startsWith('featured-')) {
         try {
-          const url = new URL(itemToRemove.thumbnailUrl)
-          const pathParts = url.pathname.split('/')
-          const storagePath = pathParts.slice(-2).join('/') // Get the last two parts (featured/filename)
-          
-          console.log('Deleting from storage path:', storagePath)
-          const { error } = await supabase.storage.from('media').remove([storagePath])
-          
-          if (error) {
-            console.error('Failed to delete thumbnail from storage:', error)
-            // Continue with local removal even if storage deletion fails
+          console.log('Attempting to delete from database...')
+          const { error: dbError } = await supabase
+            .from('videos')
+            .delete()
+            .eq('id', id)
+
+          if (dbError) {
+            console.error('Database delete error:', dbError)
+            // Continue with local removal even if database delete fails
           } else {
-            console.log('Thumbnail deleted from storage successfully')
+            console.log('Successfully deleted from database')
           }
-        } catch (storageError) {
-          console.error('Error parsing thumbnail URL for deletion:', storageError)
-          // Continue with local removal even if storage deletion fails
+        } catch (dbError) {
+          console.error('Error deleting from database:', dbError)
+          // Continue with local removal even if database delete fails
         }
       }
-      
-      // Remove from local state and localStorage
+
+      // Remove from local state
       const updatedItems = items.filter(item => item.id !== id)
       setItems(updatedItems)
-      localStorage.setItem('featuredItems', JSON.stringify(updatedItems))
       
-      toast({ title: 'Item removed successfully' })
-      console.log('Item removed from local state')
+      // Try to delete thumbnail from storage if it exists
+      const itemToRemove = items.find(item => item.id === id)
+      if (itemToRemove?.thumbnailUrl) {
+        try {
+          console.log('Attempting to delete thumbnail from storage...')
+          // Extract the file path from the public URL
+          const urlParts = itemToRemove.thumbnailUrl.split('/')
+          const fileName = urlParts[urlParts.length - 1]
+          const filePath = `featured/${fileName}`
+          
+          console.log('Deleting file from storage:', filePath)
+          const { error: storageError } = await supabase.storage
+            .from('media')
+            .remove([filePath])
+
+          if (storageError) {
+            console.error('Storage delete error:', storageError)
+          } else {
+            console.log('Successfully deleted thumbnail from storage')
+          }
+        } catch (storageError) {
+          console.error('Error deleting from storage:', storageError)
+        }
+      }
+
+      toast({ title: 'Featured content removed successfully!' })
+      console.log('Item removed successfully:', id)
+      
     } catch (error) {
       console.error('Error removing item:', error)
       toast({ 
-        title: 'Failed to remove item', 
+        title: 'Failed to remove content', 
         description: 'Please try again.', 
         variant: 'destructive' 
       })
@@ -402,65 +391,14 @@ export default function FeaturedAdminPage() {
     try {
       console.log('Importing existing content from database...')
       
-      // Try to fetch existing videos that could be featured
-      const { data: existingVideos, error } = await supabase
-        .from('videos')
-        .select('*')
-        .eq('visibility', 'public')
-        .eq('status', 'ready')
-        .not('youtube_video_id', 'is', null)
-        .limit(10)
-
-      if (error) {
-        console.error('Error fetching existing videos:', error)
-        toast({ 
-          title: 'Import failed', 
-          description: 'Could not fetch existing content from database.', 
-          variant: 'destructive' 
-        })
-        return
-      }
-
-      if (!existingVideos || existingVideos.length === 0) {
-        toast({ 
-          title: 'No content found', 
-          description: 'No existing videos found in database to import.', 
-          variant: 'default' 
-        })
-        return
-      }
-
-      // Convert to FeaturedItem format
-      const importedItems: FeaturedItem[] = existingVideos.map(video => ({
-        id: `imported-${video.id}`,
-        title: video.title || 'Untitled',
-        description: video.description || 'No description',
-        youtubeUrl: `https://www.youtube.com/watch?v=${video.youtube_video_id}`,
-        thumbnailUrl: video.thumbnail_url || video.youtube_thumbnail_url || '',
-        createdAt: new Date(video.created_at || Date.now()).getTime()
-      }))
-
-      // Merge with existing items
-      const currentItems = [...items]
-      importedItems.forEach(importedItem => {
-        const exists = currentItems.some(item => 
-          item.youtubeUrl === importedItem.youtubeUrl || 
-          item.title === importedItem.title
-        )
-        if (!exists) {
-          currentItems.push(importedItem)
-        }
-      })
-
-      setItems(currentItems)
-      localStorage.setItem('featuredItems', JSON.stringify(currentItems))
+      // Simply reload all items from database
+      await loadFeaturedItems()
       
       toast({ 
-        title: 'Import successful', 
-        description: `Imported ${importedItems.length} items from database.` 
+        title: 'Import completed', 
+        description: 'All existing content loaded from database.' 
       })
       
-      console.log('Import completed:', importedItems.length, 'items imported')
     } catch (error) {
       console.error('Error importing existing content:', error)
       toast({ 
