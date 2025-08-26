@@ -238,11 +238,56 @@ export default function FeaturedAdminPage() {
     }
   }
 
-  const removeItem = (id: string) => {
-    const updatedItems = items.filter(item => item.id !== id)
-    setItems(updatedItems)
-    localStorage.setItem('featuredItems', JSON.stringify(updatedItems))
-    toast({ title: 'Item removed successfully' })
+  const removeItem = async (id: string) => {
+    // Add confirmation dialog
+    if (!confirm('Are you sure you want to remove this featured content? This action cannot be undone.')) {
+      return
+    }
+    
+    try {
+      console.log('Removing item with ID:', id)
+      
+      // Find the item to get the thumbnail URL
+      const itemToRemove = items.find(item => item.id === id)
+      if (itemToRemove?.thumbnailUrl) {
+        console.log('Attempting to delete thumbnail from storage:', itemToRemove.thumbnailUrl)
+        
+        // Extract the path from the URL to delete from Supabase storage
+        try {
+          const url = new URL(itemToRemove.thumbnailUrl)
+          const pathParts = url.pathname.split('/')
+          const storagePath = pathParts.slice(-2).join('/') // Get the last two parts (featured/filename)
+          
+          console.log('Deleting from storage path:', storagePath)
+          const { error } = await supabase.storage.from('media').remove([storagePath])
+          
+          if (error) {
+            console.error('Failed to delete thumbnail from storage:', error)
+            // Continue with local removal even if storage deletion fails
+          } else {
+            console.log('Thumbnail deleted from storage successfully')
+          }
+        } catch (storageError) {
+          console.error('Error parsing thumbnail URL for deletion:', storageError)
+          // Continue with local removal even if storage deletion fails
+        }
+      }
+      
+      // Remove from local state and localStorage
+      const updatedItems = items.filter(item => item.id !== id)
+      setItems(updatedItems)
+      localStorage.setItem('featuredItems', JSON.stringify(updatedItems))
+      
+      toast({ title: 'Item removed successfully' })
+      console.log('Item removed from local state')
+    } catch (error) {
+      console.error('Error removing item:', error)
+      toast({ 
+        title: 'Failed to remove item', 
+        description: 'Please try again.', 
+        variant: 'destructive' 
+      })
+    }
   }
 
   // Prevent hydration mismatch
@@ -403,11 +448,17 @@ export default function FeaturedAdminPage() {
                     {items.map((item) => (
                       <div key={item.id} className="border rounded-lg p-4">
                         <div className="flex items-start gap-3">
-                          <img 
-                            src={item.thumbnailUrl} 
-                            alt={item.title}
-                            className="w-20 h-16 object-cover rounded-lg flex-shrink-0"
-                          />
+                          <div className="w-20 h-16 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
+                            <img 
+                              src={item.thumbnailUrl} 
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.error('Failed to load thumbnail:', item.thumbnailUrl)
+                                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA4MCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCAyMEg2MFY0NEgyMFYyMFoiIGZpbGw9IiNFNUU3RUIiLz4KPHBhdGggZD0iTTI4IDI4SDUyVjM2SDI4VjI4WiIgZmlsbD0iI0M3Q0QwQyIvPgo8L3N2Zz4K'
+                              }}
+                            />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">{item.title}</h3>
                             <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
@@ -415,7 +466,10 @@ export default function FeaturedAdminPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => window.open(item.youtubeUrl, '_blank')}
+                                onClick={() => {
+                                  console.log('Opening YouTube URL:', item.youtubeUrl)
+                                  window.open(item.youtubeUrl, '_blank')
+                                }}
                               >
                                 <Play className="h-3 w-3 mr-1" />
                                 Watch
