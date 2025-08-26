@@ -455,6 +455,135 @@ export default function FeaturedAdminPage() {
     }
   }
 
+  const removeAllContentAggressive = async () => {
+    if (!confirm('⚠️ NUCLEAR OPTION: This will delete ALL videos from your database, not just featured ones. Are you absolutely sure? This cannot be undone!')) {
+      return
+    }
+
+    try {
+      console.log('Aggressively removing ALL videos from database...')
+      
+      // Delete ALL videos from database (nuclear option)
+      const { error: dbError } = await supabase
+        .from('videos')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all except impossible ID
+
+      if (dbError) {
+        console.error('Database delete error:', dbError)
+        toast({ 
+          title: 'Error removing content', 
+          description: 'Could not remove videos from database.', 
+          variant: 'destructive' 
+        })
+        return
+      }
+
+      // Clear local state
+      setItems([])
+      
+      toast({ 
+        title: 'ALL VIDEOS DELETED!', 
+        description: 'Every single video has been removed from your database.' 
+      })
+      
+      console.log('All videos aggressively removed from database')
+      
+    } catch (error) {
+      console.error('Error in aggressive removal:', error)
+      toast({ 
+        title: 'Error removing content', 
+        description: 'An error occurred while removing videos.', 
+        variant: 'destructive' 
+      })
+    }
+  }
+
+  const forceRefresh = async () => {
+    try {
+      console.log('Force refreshing featured content...')
+      setLoading(true)
+      
+      // Clear current items
+      setItems([])
+      
+      // Force reload from database
+      await loadFeaturedItems()
+      
+      toast({ 
+        title: 'Refresh completed', 
+        description: `Found ${items.length} items in database.` 
+      })
+      
+    } catch (error) {
+      console.error('Error in force refresh:', error)
+      toast({ 
+        title: 'Refresh failed', 
+        description: 'Error refreshing content.', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const debugDatabase = async () => {
+    try {
+      console.log('Debugging database content...')
+      
+      // Check all videos in database
+      const { data: allVideos, error: allError } = await supabase
+        .from('videos')
+        .select('*')
+      
+      if (allError) {
+        console.error('Error fetching all videos:', allError)
+        toast({ 
+          title: 'Database error', 
+          description: 'Could not fetch videos from database.', 
+          variant: 'destructive' 
+        })
+        return
+      }
+
+      console.log('All videos in database:', allVideos)
+      
+      // Check featured videos specifically
+      const { data: featuredVideos, error: featuredError } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('visibility', 'public')
+        .eq('status', 'ready')
+        .not('youtube_video_id', 'is', null)
+
+      if (featuredError) {
+        console.error('Error fetching featured videos:', featuredError)
+        toast({ 
+          title: 'Featured videos error', 
+          description: 'Could not fetch featured videos.', 
+          variant: 'destructive' 
+        })
+        return
+      }
+
+      console.log('Featured videos found:', featuredVideos)
+      
+      // Show debug info
+      toast({ 
+        title: 'Debug Info', 
+        description: `Total videos: ${allVideos?.length || 0}, Featured: ${featuredVideos?.length || 0}` 
+      })
+      
+    } catch (error) {
+      console.error('Error in debug:', error)
+      toast({ 
+        title: 'Debug failed', 
+        description: 'Error debugging database.', 
+        variant: 'destructive' 
+      })
+    }
+  }
+
   // Prevent hydration mismatch
   if (!mounted) {
     return null
@@ -515,6 +644,30 @@ export default function FeaturedAdminPage() {
                   Remove All
                 </Button>
               )}
+              <Button 
+                variant="destructive" 
+                onClick={removeAllContentAggressive}
+                className="whitespace-nowrap border-2 border-red-600"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                NUCLEAR OPTION
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={forceRefresh}
+                className="whitespace-nowrap"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Force Refresh
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={debugDatabase}
+                className="whitespace-nowrap"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Debug DB
+              </Button>
             </div>
           </div>
 
