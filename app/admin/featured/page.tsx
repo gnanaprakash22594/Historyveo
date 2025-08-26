@@ -409,6 +409,52 @@ export default function FeaturedAdminPage() {
     }
   }
 
+  const removeAllContent = async () => {
+    if (!confirm('Are you sure you want to remove ALL featured content? This action cannot be undone and will delete all content from the database.')) {
+      return
+    }
+
+    try {
+      console.log('Removing all featured content...')
+      
+      // Delete all featured videos from database
+      const { error: dbError } = await supabase
+        .from('videos')
+        .delete()
+        .eq('visibility', 'public')
+        .eq('status', 'ready')
+        .not('youtube_video_id', 'is', null)
+
+      if (dbError) {
+        console.error('Database delete error:', dbError)
+        toast({ 
+          title: 'Error removing content', 
+          description: 'Could not remove all content from database.', 
+          variant: 'destructive' 
+        })
+        return
+      }
+
+      // Clear local state
+      setItems([])
+      
+      toast({ 
+        title: 'All content removed!', 
+        description: 'All featured content has been deleted from the database.' 
+      })
+      
+      console.log('All featured content removed successfully')
+      
+    } catch (error) {
+      console.error('Error removing all content:', error)
+      toast({ 
+        title: 'Error removing content', 
+        description: 'An error occurred while removing content.', 
+        variant: 'destructive' 
+      })
+    }
+  }
+
   // Prevent hydration mismatch
   if (!mounted) {
     return null
@@ -450,14 +496,26 @@ export default function FeaturedAdminPage() {
               <h1 className="text-3xl font-bold">Featured Content Management</h1>
               <p className="text-muted-foreground">Add YouTube videos to showcase on your homepage</p>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={importExistingContent}
-              className="whitespace-nowrap"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import Existing
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={importExistingContent}
+                className="whitespace-nowrap"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import Existing
+              </Button>
+              {items.length > 0 && (
+                <Button 
+                  variant="destructive" 
+                  onClick={removeAllContent}
+                  className="whitespace-nowrap"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove All
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
