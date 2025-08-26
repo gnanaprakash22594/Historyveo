@@ -2,7 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "functions": {},
   "env": {
     "NODE_ENV": "production"
   },
