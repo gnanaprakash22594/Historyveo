@@ -218,33 +218,32 @@ export default function MediaUploadPage() {
     setUploading(true)
 
     try {
-      const uploadPromises = form.files.map(file => uploadFile(file))
-      const uploadedUrls = await Promise.all(uploadPromises)
+      const uploadedUrls = await Promise.all(form.files.map(file => uploadFile(file)))
 
-      // Create content records for each uploaded file
-      const contentPromises = form.files.map((file, index) => {
-        const mediaUrl = uploadedUrls[index]
-        const thumbnailUrl = form.content_type === 'image' ? mediaUrl : undefined
+      // Create content records for each uploaded file (only valid columns)
+      const results = await Promise.all(
+        form.files.map((file, index) => {
+          const mediaUrl = uploadedUrls[index]
+          const thumbnailUrl = form.content_type === 'image' ? mediaUrl : undefined
 
-        return supabase
-          .from('videos')
-          .insert({
-            title: `${form.title} - ${file.name}`,
-            slug: generateSlug(`${form.title} - ${file.name}`),
-            description: form.description,
-            content_type: form.content_type,
-            media_url: mediaUrl,
-            thumbnail_url: thumbnailUrl,
-            tags: form.tags ? form.tags.split(',').map(tag => tag.trim()) : null,
-            language: form.language,
-            visibility: form.visibility,
-            status: 'ready',
-            created_by: user.id,
-            category: form.category || null
-          } as any)
-      })
+          return supabase
+            .from('videos')
+            .insert({
+              title: `${form.title} - ${file.name}`,
+              slug: generateSlug(`${form.title} - ${file.name}`),
+              description: form.description,
+              thumbnail_url: thumbnailUrl || null,
+              tags: form.tags ? form.tags.split(',').map(tag => tag.trim()) : null,
+              language: form.language,
+              visibility: form.visibility,
+              status: 'ready',
+              created_by: user.id
+            } as any)
+        })
+      )
 
-      await Promise.all(contentPromises)
+      const firstError = results.find((r: any) => r?.error)
+      if (firstError) throw firstError.error
 
       toast({
         title: "Media uploaded successfully!",

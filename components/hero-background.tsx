@@ -43,11 +43,12 @@ export default function HeroBackground() {
 
         setMedia({ imageUrl, videoUrl })
       } catch (e) {
-        // ignore
+        setMedia({})
       }
     }
-
+    const t = setTimeout(() => setMedia((m) => (m.imageUrl || m.videoUrl ? m : {})), 4000)
     load()
+    return () => clearTimeout(t)
   }, [])
 
   if (!media.imageUrl && !media.videoUrl) {
