@@ -84,14 +84,30 @@ export default function FeaturedAdminPage() {
   }
 
   const uploadThumbnail = async (file: File) => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const name = `featured-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const path = `featured/${name}`
+    console.log('uploadThumbnail called with file:', file.name)
     
-    const { error } = await supabase.storage.from('media').upload(path, file)
-    if (error) throw error
-    
-    return supabase.storage.from('media').getPublicUrl(path).data.publicUrl
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const name = `featured-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const path = `featured/${name}`
+      
+      console.log('Uploading to path:', path)
+      
+      const { error } = await supabase.storage.from('media').upload(path, file)
+      if (error) {
+        console.error('Supabase upload error:', error)
+        throw error
+      }
+      
+      console.log('File uploaded successfully, getting public URL')
+      const publicUrl = supabase.storage.from('media').getPublicUrl(path).data.publicUrl
+      console.log('Public URL:', publicUrl)
+      
+      return publicUrl
+    } catch (error) {
+      console.error('Error in uploadThumbnail:', error)
+      throw error
+    }
   }
 
   const parseYouTubeId = (input: string): string | null => {
@@ -184,12 +200,41 @@ export default function FeaturedAdminPage() {
   }
 
   const handleThumbnailUpload = async (file: File) => {
+    console.log('Starting thumbnail upload for file:', file.name, 'Size:', file.size)
+    
+    if (!file) {
+      console.error('No file provided for upload')
+      toast({ title: 'No file selected', description: 'Please select an image file.', variant: 'destructive' })
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      console.error('Invalid file type:', file.type)
+      toast({ title: 'Invalid file type', description: 'Please select an image file (JPG, PNG, etc.).', variant: 'destructive' })
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      console.error('File too large:', file.size)
+      toast({ title: 'File too large', description: 'Please select an image smaller than 5MB.', variant: 'destructive' })
+      return
+    }
+
     try {
+      console.log('Uploading thumbnail to Supabase...')
       const url = await uploadThumbnail(file)
+      console.log('Thumbnail upload successful:', url)
       setThumbnailUrl(url)
       toast({ title: 'Thumbnail uploaded successfully!' })
     } catch (error: any) {
-      toast({ title: 'Thumbnail upload failed', description: error.message, variant: 'destructive' })
+      console.error('Thumbnail upload failed:', error)
+      toast({ 
+        title: 'Thumbnail upload failed', 
+        description: error.message || 'Please try again with a different image.', 
+        variant: 'destructive' 
+      })
     }
   }
 
@@ -293,7 +338,12 @@ export default function FeaturedAdminPage() {
                       ref={fileInputRef}
                       type="file"
                       accept="image/*"
-                      onChange={(e) => handleThumbnailUpload(e.target.files?.[0]!)}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleThumbnailUpload(file)
+                        }
+                      }}
                       className="hidden"
                     />
                     <Button
