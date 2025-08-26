@@ -5,82 +5,73 @@ import { useRouter } from 'next/navigation'
 import { 
   Upload, 
   Image, 
-  Video, 
-  Settings,
-  Plus,
-  Edit
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
 import Navigation from '@/components/navigation'
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    checkUser()
+    // Simple auth check
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Quick role check
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+          
+          if (profile?.role === 'admin') {
+            setUser(profile)
+          } else {
+            // Not admin, redirect
+            window.location.href = '/admin/login'
+            return
+          }
+        } else {
+          // No user, redirect
+          window.location.href = '/admin/login'
+          return
+        }
+      } catch (error) {
+        // Error, redirect
+        window.location.href = '/admin/login'
+        return
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
   }, [])
 
-  const checkUser = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/admin/login')
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile || (profile as any).role !== 'admin') {
-        toast({
-          title: "Access denied",
-          description: "You need admin privileges to access this page.",
-          variant: "destructive",
-        })
-        router.push('/admin/login')
-        return
-      }
-
-      setUser(profile)
-    } catch (error) {
-      console.error('Error checking user:', error)
-      router.push('/admin/login')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return null
-  }
-
-  // Show loading spinner while checking authentication
+  // Simple loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
         <div className="container mx-auto px-4 py-12">
           <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Loading admin panel...</p>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  // If not authenticated, don't render content (will redirect)
+  // If no user, show nothing (will redirect)
   if (!user) {
     return null
   }
@@ -112,7 +103,7 @@ export default function AdminDashboard() {
                   Upload YouTube videos with custom thumbnails and descriptions to showcase on your homepage.
                 </p>
                 <Button 
-                  onClick={() => router.push('/admin/featured')}
+                  onClick={() => window.location.href = '/admin/featured'}
                   className="w-full"
                   size="lg"
                 >
@@ -138,11 +129,11 @@ export default function AdminDashboard() {
                   Set the background image or video for your homepage hero section.
                 </p>
                 <Button 
-                  onClick={() => router.push('/admin/hero')}
+                  onClick={() => window.location.href = '/admin/hero'}
                   className="w-full"
                   size="lg"
                 >
-                  <Settings className="mr-2 h-4 w-4" />
+                  <Image className="mr-2 h-4 w-4" />
                   Manage Hero Section
                 </Button>
               </CardContent>

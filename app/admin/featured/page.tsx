@@ -44,7 +44,7 @@ export default function FeaturedAdminPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.push('/admin/login')
+        window.location.href = '/admin/login'
         return
       }
       const { data: profile } = await supabase
@@ -53,12 +53,12 @@ export default function FeaturedAdminPage() {
         .eq('id', user.id)
         .single()
       if (!profile || (profile as any).role !== 'admin') {
-        router.push('/admin/login')
+        window.location.href = '/admin/login'
         return
       }
       setUser(profile)
     } catch (e) {
-      router.push('/admin/login')
+      window.location.href = '/admin/login'
     } finally {
       setLoading(false)
     }
